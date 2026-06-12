@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>支付查看</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            display: flex;
+            flex-direction: column;
+            background: #f5f5f5;
+            padding: 20px;
+            /* 增加整体高度，制造滚动区域 */
+            min-height: 180vh;
+        }
+        .container {
+            width: 100%;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        #showBtn {
+            width: 100%;
+            padding: 15px;
+            background: #ff6f61;
+            color: white;
+            border: none;
+            border-radius: 30px;
+            font-size: 18px;
+            cursor: pointer;
+            transition: transform 0.2s;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(255, 111, 97, 0.3);
+        }
+        #showBtn:active {
+            transform: scale(0.98);
+        }
+        .qr-code {
+            width: 380px;
+            height: auto;
+            border: 2px solid #eee;
+            border-radius: 12px;
+            padding: 10px;
+            background: white;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            object-fit: contain;
+            display: block;
+            margin: 0 auto;
+        }
+        .hint-text{
+            text-align: center;
+            margin: 10px 0;
+            font-size: 16px;
+        }
+        #statusText {
+            text-align: center;
+            color: #666;
+            margin: 10px 0;
+        }
+        #result {
+            font-size: 40px;
+            font-weight: bold;
+            text-align: center;
+            margin-top: 30px;
+            display: none;
+        }
+        #resultUrl {
+            display: none;
+            padding: 15px;
+            background: #e6f7ff;
+            border-radius: 10px;
+            font-weight: bold;
+            color: #1890ff;
+            text-align: center;
+            margin-top: 20px;
+            word-break: break-all;
+        }
+        /* 权限按钮：靠最底部，距离上方大量间距，需滚动查看 */
+        #authBtn {
+            width: 100%;
+            padding: 12px;
+            background: #2f54eb;
+            color: #fff;
+            border: none;
+            border-radius: 30px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 1300px;
+            margin-bottom: 30px;
+            display: none;
+        }
+        #authBtn:active {
+            transform: scale(0.98);
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <button id="showBtn">点击查看，支付后自动显示内容</button>
+    <p class="scan-hint" style="text-align:center; display:none;">📱 请扫码支付</p>
+
+    <div id="paymentArea" style="display:none; text-align:center;">
+        <p class="hint-text">💡 请截屏使用微信扫码支付，支付后自动显示</p>
+        <img src="https://raw.githubusercontent.com/selfguo/network/refs/heads/main/%E5%BE%AE%E4%BF%A13.jpg" class="qr-code" id="qrcode"><br>
+        <p id="statusText">等待支付确认中...</p>
+        <div id="result"></div>
+        <div id="resultUrl"></div>
+    </div>
+
+    <!-- 权限按钮，靠页面底部，需滑动才能看到 -->
+    <button id="authBtn">权限</button>
+</div>
+
+<script>
+    const CORRECT_PWD = "1017";
+    let checkTimer = null;
+
+    function getLocalPwd() {
+        return localStorage.getItem("pwdCache") || "";
+    }
+
+    function setLocalPwd(pwd) {
+        localStorage.setItem("pwdCache", pwd);
+    }
+
+    window.onload = function(){
+        let cachePwd = getLocalPwd();
+        if(cachePwd === CORRECT_PWD){
+            switchToSuccess();
+        }
+        // 绑定点击事件，彻底规避 javascript: 地址栏显示
+        document.getElementById("showBtn").addEventListener("click", showImage);
+        document.getElementById("authBtn").addEventListener("click", checkPassword);
+    }
+
+    function showImage() {
+        document.getElementById("showBtn").style.display = "none";
+        document.querySelector(".scan-hint").style.display = "block";
+        document.getElementById("paymentArea").style.display = "block";
+
+        let cachePwd = getLocalPwd();
+        if(cachePwd === CORRECT_PWD){
+            switchToSuccess();
+            return;
+        }
+        document.getElementById("authBtn").style.display = "block";
+        if (!checkTimer) {
+            checkTimer = setInterval(checkPwdCache, 5000);
+        }
+    }
+
+    function checkPassword() {
+        let inputPwd = prompt("请输入权限密码：");
+        let pwd = inputPwd || "";
+        setLocalPwd(pwd);
+
+        if(pwd !== CORRECT_PWD){
+            switchToImage();
+        } else {
+            switchToSuccess();
+        }
+    }
+
+    function checkPwdCache() {
+        let cachePwd = getLocalPwd();
+        if (cachePwd === CORRECT_PWD) {
+            switchToSuccess();
+        } else {
+            switchToImage();
+        }
+    }
+
+    // 切换到同意界面
+    function switchToSuccess(){
+        document.getElementById("qrcode").style.display = "none";
+        document.getElementById("statusText").style.display = "none";
+
+        document.getElementById("result").innerText = "同意";
+        document.getElementById("result").style.color = "green";
+        document.getElementById("result").style.display = "block";
+
+        document.getElementById("resultUrl").innerText = "✅ 验证成功！网址/内容：https://986271.lol";
+        document.getElementById("resultUrl").style.display = "block";
+
+        document.getElementById("authBtn").style.display = "block";
+    }
+
+    // 切换回图片界面
+    function switchToImage(){
+        document.getElementById("qrcode").style.display = "block";
+        document.getElementById("statusText").style.display = "block";
+        document.getElementById("result").style.display = "none";
+        document.getElementById("resultUrl").style.display = "none";
+        document.getElementById("authBtn").style.display = "block";
+    }
+
+    document.addEventListener('keydown', e => {
+        if (e.key === 'F12' || (e.ctrlKey && e.key === 'u')) e.preventDefault();
+    });
+    document.addEventListener('contextmenu', e => e.preventDefault());
+</script>
+
+</body>
+</html>
