@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>TOTP动态验证码</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-family: "Microsoft YaHei", SimHei, sans-serif;
+            background: #ffffff;
+        }
+        .title {
+            font-size: 80px;
+            font-weight: bold;
+            color: #000000;
+            margin-bottom: 40px;
+        }
+        .code-box {
+            font-size: 100px;
+            font-weight: bold;
+            letter-spacing: 12px;
+            color: #0044aa;
+            margin-bottom: 60px;
+        }
+        .desc {
+            font-size: 60px;
+            color: #555555;
+        }
+    </style>
+</head>
+<body>
+    <div class="title">当前动态验证码</div>
+    <div class="code-box" id="codeDom"></div>
+    <div class="desc">密钥：UNCSEF5EHXSRAEWS | 周期30秒</div>
+
+<script>
+// 原生纯JS TOTP实现，无任何外部依赖
+const base32Table = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+// Base32解码
+function base32Decode(str) {
+    str = str.toUpperCase().replace(/=/g, "");
+    let bitStr = "";
+    for (let char of str) {
+        let idx = base32Table.indexOf(char);
+        bitStr += idx.toString(2).padStart(5, "0");
+    }
+    const byteArr = [];
+    for (let i = 0; i + 8 <= bitStr.length; i += 8) {
+        byteArr.push(parseInt(bitStr.slice(i, i + 8), 2));
+    }
+    return new Uint8Array(byteArr);
+}
+// 数字转8字节大端缓冲区
+function numTo8Buf(num) {
+    const buf = new Uint8Array(8);
+    for (let i = 7; i >= 0; i--) {
+        buf[i] = num & 0xff;
+        num = Math.floor(num / 256);
+    }
+    return buf;
+}
+// HMAC-SHA1 签名
+async function hmacSha1(keyBuf, dataBuf) {
+    const key = await crypto.subtle.importKey(
+        "raw",
+        keyBuf,
+        { name: "HMAC", hash: "SHA-1" },
+        false,
+        ["sign"]
+    );
+    const sign = await crypto.subtle.sign("HMAC", key, dataBuf);
+    return new Uint8Array(sign);
+}
+// 计算TOTP 6位验证码
+async function calcTOTP(secret32, period = 30, digits = 6) {
+    const keyBytes = base32Decode(secret32);
+    const timeStep = Math.floor(Date.now() / 1000 / period);
+    const timeBuf = numTo8Buf(timeStep);
+    const hmacResult = await hmacSha1(keyBytes, timeBuf);
+    const offset = hmacResult[hmacResult.length - 1] & 0x0f;
+    const codeNum = ((hmacResult[offset] & 0x7f) << 24)
+        | (hmacResult[offset + 1] << 16)
+        | (hmacResult[offset + 2] << 8)
+        | hmacResult[offset + 3];
+    const mod = 10 ** digits;
+    return String(codeNum % mod).padStart(digits, "0");
+}
+// 刷新页面验证码
+async function refreshCode() {
+    const code = await calcTOTP("UNCSEF5EHXSRAEWS", 30, 6);
+    document.getElementById("codeDom").innerText = code;
+}
+// 页面加载完成立刻显示结果
+window.onload = function() {
+    refreshCode();
+    setInterval(refreshCode, 1000);
+}
+</script>
+</body>
+</html>
