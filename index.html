@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>展示页面</title>
+<style>
+body {text-align:center;padding:15px;margin:0;}
+img {max-width:100%;}
+#word {font-size:34px;font-weight:bold;margin-top:20px;}
+</style>
+</head>
+<body>
+<!-- 图片地址不变 -->
+<img src="https://raw.githubusercontent.com/selfguo/network/refs/heads/main/%E5%BE%AE%E4%BF%A13.jpg">
+<div id="word"></div>
+
+<script>
+// 改用Pages域名读取状态文件，避开raw长缓存
+function refreshState(){
+  let t = Date.now();
+  // 关键：使用自己的pages域名，而非raw.githubusercontent
+  let stateUrl = `https://selfguo.github.io/network/status.txt?t=${t}`;
+  fetch(stateUrl, {cache:"no-cache"})
+  .then(res=>res.text())
+  .then(txt=>{
+    let content = txt.trim();
+    let box = document.getElementById("word");
+    box.innerText = content === "agree" ? "同意" : "";
+  })
+  .catch(e=>console.log(e));
+}
+// 立即执行 + 5秒自动轮询
+refreshState();
+setInterval(refreshState,5000);
+</script>
+</body>
+</html>
