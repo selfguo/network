@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>支付查看</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            display: flex;
+            flex-direction: column;
+            background: #f5f5f5;
+            padding: 20px;
+            min-height: 180vh;
+        }
+        .container {
+            width: 100%;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        #showBtn {
+            width: 100%;
+            padding: 15px;
+            background: #ff6f61;
+            color: white;
+            border: none;
+            border-radius: 30px;
+            font-size: 18px;
+            cursor: pointer;
+            transition: transform 0.2s;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(255, 111, 97, 0.3);
+        }
+        #showBtn:active {
+            transform: scale(0.98);
+        }
+        .qr-code {
+            width: 380px;
+            height: auto;
+            border: 2px solid #eee;
+            border-radius: 12px;
+            padding: 10px;
+            background: white;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            object-fit: contain;
+            margin: 0 auto;
+        }
+        .hint-text{
+            text-align: center;
+            margin: 10px 0;
+            font-size: 16px;
+        }
+        #statusText {
+            text-align: center;
+            color: #666;
+            margin: 10px 0;
+        }
+        #result {
+            font-size: 40px;
+            font-weight: bold;
+            text-align: center;
+            margin-top: 30px;
+            display: none;
+        }
+        #resultUrl {
+            display: none;
+            padding: 15px;
+            background: #e6f7ff;
+            border-radius: 10px;
+            font-weight: bold;
+            color: #1890ff;
+            text-align: center;
+            margin-top: 20px;
+            word-break: break-all;
+        }
+        #authBtn {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <button id="showBtn">点击查看，支付后自动显示内容</button>
+    <p class="scan-hint" id="topTip" style="text-align:center; display:none;">📱 请扫码支付</p>
+
+    <div id="paymentArea" style="display:none; text-align:center;">
+        <p class="hint-text" id="midTip">💡 请截屏使用微信扫码支付，支付后自动显示</p>
+        <img src="https://raw.githubusercontent.com/selfguo/network/refs/heads/main/%E5%BE%AE%E4%BF%A13.jpg" class="qr-code" id="qrcode"><br>
+        <p id="statusText">等待支付确认中...</p>
+        <div id="result"></div>
+        <div id="resultUrl"></div>
+    </div>
+
+    <button id="authBtn">权限</button>
+</div>
+
+<script>
+    let checkTimer = null;
+    let lastState = null;
+
+    window.onload = function(){
+        document.getElementById("showBtn").addEventListener("click", showImage);
+    }
+
+    function showImage() {
+        document.getElementById("showBtn").style.display = "none";
+        document.getElementById("paymentArea").style.display = "block";
+
+        // 打开面板时统一全部隐藏，等待接口数据再渲染
+        const topTip = document.getElementById("topTip");
+        const midTip = document.getElementById("midTip");
+        const qrcode = document.getElementById("qrcode");
+        const statusText = document.getElementById("statusText");
+        const resultDom = document.getElementById("result");
+        const resultUrlDom = document.getElementById("resultUrl");
+
+        topTip.style.display = "none";
+        midTip.style.display = "none";
+        qrcode.style.display = "none";
+        statusText.style.display = "none";
+        resultDom.style.display = "none";
+        resultUrlDom.style.display = "none";
+
+        if (!checkTimer) {
+            refreshState();
+            checkTimer = setInterval(refreshState, 5000);
+        }
+    }
+
+    function refreshState(){
+        let t = Date.now();
+        let url = `https://selfguo.github.io/network/status.txt?t=${t}`;
+        fetch(url, {cache:"no-cache"})
+        .then(res=>res.text())
+        .then(txt=>{
+            let val = txt.trim();
+            // 状态没变化不重绘，消除闪烁
+            if(val === lastState) return;
+            lastState = val;
+
+            const topTip = document.getElementById("topTip");
+            const midTip = document.getElementById("midTip");
+            const qrcode = document.getElementById("qrcode");
+            const statusText = document.getElementById("statusText");
+            const resultDom = document.getElementById("result");
+            const resultUrlDom = document.getElementById("resultUrl");
+
+            if(val === "agree"){
+                // 同意状态：隐藏所有扫码内容，只展示成功文字
+                topTip.style.display = "none";
+                midTip.style.display = "none";
+                qrcode.style.display = "none";
+                statusText.style.display = "none";
+                resultDom.innerText = "同意";
+                resultDom.style.color = "green";
+                resultDom.style.display = "block";
+                resultUrlDom.innerText = "✅ 验证成功！网址/内容：https://986271.lol";
+                resultUrlDom.style.display = "block";
+            }else{
+                // 非agree：完整展示图片+全部提示文字
+                topTip.style.display = "block";
+                midTip.style.display = "block";
+                qrcode.style.display = "block";
+                statusText.style.display = "block";
+                resultDom.style.display = "none";
+                resultUrlDom.style.display = "none";
+            }
+        })
+        .catch(e=>{
+            console.log("读取状态失败：", e);
+        });
+    }
+
+    document.addEventListener('keydown', e => {
+        if (e.key === 'F12' || (e.ctrlKey && e.key === 'u')) e.preventDefault();
+    });
+    document.addEventListener('contextmenu', e => e.preventDefault());
+</script>
+
+</body>
+</html>
