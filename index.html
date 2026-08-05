@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>查看</title>
+    <title>支付查看</title>
     <style>
         * {
             margin: 0;
@@ -22,7 +22,7 @@
             max-width: 600px;
             margin: 0 auto;
         }
-        #showBtn {
+        .main-btn {
             width: 100%;
             padding: 15px;
             background: #ff6f61;
@@ -32,10 +32,26 @@
             font-size: 18px;
             cursor: pointer;
             transition: transform 0.2s;
-            margin-bottom: 20px;
+            margin-bottom: 15px;
             box-shadow: 0 4px 6px rgba(255, 111, 97, 0.3);
         }
-        #showBtn:active {
+        .main-btn:active {
+            transform: scale(0.98);
+        }
+        .back-btn {
+            width: 100%;
+            padding: 12px;
+            background: #409eff;
+            color: white;
+            border: none;
+            border-radius: 30px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: transform 0.2s;
+            margin: 20px 0;
+            box-shadow: 0 4px 6px rgba(64, 158, 255, 0.3);
+        }
+        .back-btn:active {
             transform: scale(0.98);
         }
         .qr-code {
@@ -47,7 +63,8 @@
             background: white;
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
             object-fit: contain;
-            margin: 0 auto;
+            margin: 1px auto;
+            display:block;
         }
         .hint-text{
             text-align: center;
@@ -80,20 +97,42 @@
         #authBtn {
             display: none !important;
         }
+        /* 页面区域控制 */
+        .page {
+            display: none;
+        }
+        .page.active {
+            display: block;
+        }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <button id="showBtn">点击查看，支付后自动显示内容</button>
-    <p class="scan-hint" id="topTip" style="text-align:center; display:none;">📱 请扫码支付</p>
+    <!-- 主界面 -->
+    <div id="mainPage" class="page active">
+        <button class="main-btn" id="btnScreen">界面截图</button>
+        <button class="main-btn" id="btnGetUrl">获取地址</button>
+    </div>
 
-    <div id="paymentArea" style="display:none; text-align:center;">
-        <p class="hint-text" id="midTip">💡 请截屏使用微信扫码支付，支付后自动显示</p>
-        <img src="https://raw.githubusercontent.com/selfguo/network/refs/heads/main/%E5%BE%AE%E4%BF%A13.jpg" class="qr-code" id="qrcode"><br>
-        <p id="statusText">等待支付确认中...</p>
-        <div id="result"></div>
-        <div id="resultUrl"></div>
+    <!-- 界面截图页面 -->
+    <div id="screenPage" class="page">
+        <img src="https://raw.githubusercontent.com/selfguo/network/refs/heads/main/lol3.jpg" class="qr-code">
+        <button class="back-btn" id="backFromScreen">返回主界面</button>
+    </div>
+
+    <!-- 获取地址（原支付页面） -->
+    <div id="payPage" class="page">
+        <p class="scan-hint" id="topTip" style="text-align:center; display:none;">📱 请扫码支付</p>
+
+        <div id="paymentArea">
+            <p class="hint-text" id="midTip">💡 请截屏使用微信扫码支付，支付后自动显示</p>
+            <img src="https://raw.githubusercontent.com/selfguo/network/refs/heads/main/%E5%BE%AE%E4%BF%A13.jpg" class="qr-code" id="qrcode"><br>
+            <p id="statusText">等待支付确认中...</p>
+            <div id="result"></div>
+            <div id="resultUrl"></div>
+        </div>
+        <button class="back-btn" id="backFromPay">返回主界面</button>
     </div>
 
     <button id="authBtn">权限</button>
@@ -103,15 +142,28 @@
     let checkTimer = null;
     let lastState = null;
 
-    window.onload = function(){
-        document.getElementById("showBtn").addEventListener("click", showImage);
+    // 页面切换函数
+    function switchPage(showPageId){
+        // 关闭所有页面
+        document.querySelectorAll('.page').forEach(page=>{
+            page.classList.remove('active');
+        });
+        // 展示目标页面
+        document.getElementById(showPageId).classList.add('active');
+
+        // 切出支付页面时启动轮询，切走支付页面清除定时器
+        if(showPageId === 'payPage'){
+            initPayView();
+        }else{
+            if(checkTimer){
+                clearInterval(checkTimer);
+                checkTimer = null;
+            }
+        }
     }
 
-    function showImage() {
-        document.getElementById("showBtn").style.display = "none";
-        document.getElementById("paymentArea").style.display = "block";
-
-        // 打开面板时统一全部隐藏，等待接口数据再渲染
+    // 初始化支付页面视图
+    function initPayView(){
         const topTip = document.getElementById("topTip");
         const midTip = document.getElementById("midTip");
         const qrcode = document.getElementById("qrcode");
@@ -126,6 +178,7 @@
         resultDom.style.display = "none";
         resultUrlDom.style.display = "none";
 
+        lastState = null;
         if (!checkTimer) {
             refreshState();
             checkTimer = setInterval(refreshState, 5000);
@@ -139,7 +192,6 @@
         .then(res=>res.text())
         .then(txt=>{
             let val = txt.trim();
-            // 状态没变化不重绘，消除闪烁
             if(val === lastState) return;
             lastState = val;
 
@@ -151,18 +203,16 @@
             const resultUrlDom = document.getElementById("resultUrl");
 
             if(val === "agree"){
-                // 同意状态：隐藏所有扫码内容，只展示成功文字
                 topTip.style.display = "none";
                 midTip.style.display = "none";
                 qrcode.style.display = "none";
                 statusText.style.display = "none";
-                resultDom.innerText = "同意";
+                // resultDom.innerText = "同意";
                 resultDom.style.color = "green";
                 resultDom.style.display = "block";
                 resultUrlDom.innerText = "✅ 验证成功！网址/内容：https://986271.lol";
                 resultUrlDom.style.display = "block";
             }else{
-                // 非agree：完整展示图片+全部提示文字
                 topTip.style.display = "block";
                 midTip.style.display = "block";
                 qrcode.style.display = "block";
@@ -176,6 +226,17 @@
         });
     }
 
+    window.onload = function(){
+        // 主界面两个按钮
+        document.getElementById("btnScreen").addEventListener("click", ()=>switchPage('screenPage'));
+        document.getElementById("btnGetUrl").addEventListener("click", ()=>switchPage('payPage'));
+
+        // 返回按钮
+        document.getElementById("backFromScreen").addEventListener("click", ()=>switchPage('mainPage'));
+        document.getElementById("backFromPay").addEventListener("click", ()=>switchPage('mainPage'));
+    }
+
+    // 禁止F12、禁止右键
     document.addEventListener('keydown', e => {
         if (e.key === 'F12' || (e.ctrlKey && e.key === 'u')) e.preventDefault();
     });
